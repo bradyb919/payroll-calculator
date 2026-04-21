@@ -2366,6 +2366,110 @@ let employeeIDs = {};
 let commissionData = [];
 let bonusData = [];
 
+// ─── SESSION PERSISTENCE ────────────────────────────────────────────────
+const SESSION_KEY = 'payrollSession_v2';
+
+function saveSession() {
+  try {
+    const inputState = {}, radioGroups = {};
+    document.querySelectorAll('input[type="number"][id], input[type="text"][id]').forEach(el => {
+      if (el.value !== '' && el.value !== '0') inputState[el.id] = el.value;
+    });
+    document.querySelectorAll('input[type="checkbox"][id]').forEach(el => {
+      inputState[el.id] = el.checked;
+    });
+    document.querySelectorAll('input[type="radio"]:checked').forEach(el => {
+      if (el.name) radioGroups[el.name] = el.value;
+    });
+    localStorage.setItem(SESSION_KEY, JSON.stringify({
+      commissionData: commissionData.length ? commissionData : null,
+      bonusData:      bonusData.length      ? bonusData      : null,
+      srMgrData:      srMgrData.length      ? srMgrData      : null,
+      inputState, radioGroups
+    }));
+  } catch(e) { console.error('saveSession:', e); }
+}
+
+function applyInputState(inputState, radioGroups) {
+  if (inputState) {
+    Object.entries(inputState).forEach(([id, value]) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.type === 'checkbox' ? (el.checked = !!value) : (el.value = value);
+    });
+  }
+  if (radioGroups) {
+    Object.entries(radioGroups).forEach(([name, value]) => {
+      const el = document.querySelector(`input[type="radio"][name="${name}"][value="${CSS.escape(value)}"]`);
+      if (el) el.checked = true;
+    });
+  }
+}
+
+function restoreSession() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
+    if (!saved) return;
+
+    if (saved.commissionData?.length) {
+      commissionData = saved.commissionData;
+      const zone = document.getElementById('commUploadZone');
+      zone.classList.add('loaded');
+      zone.onclick = null;
+      zone.querySelector('h4').textContent = commissionData.length + ' employees loaded';
+      zone.querySelector('p').textContent = 'KPI data ready for calculation';
+      zone.querySelector('.btn:not(.zone-remove-btn)').style.display = 'none';
+      addZoneRemoveButton(zone, 'comm');
+      createCommissionChargebackInputs();
+      document.getElementById('commissionCalculateSection').classList.remove('hidden');
+    }
+
+    if (saved.bonusData?.length) {
+      bonusData = saved.bonusData;
+      const zone = document.getElementById('bonusUploadZone');
+      zone.classList.add('loaded');
+      zone.onclick = null;
+      zone.querySelector('h4').textContent = bonusData.length + ' employees loaded';
+      zone.querySelector('p').textContent = 'KPI data ready for calculation';
+      zone.querySelector('.btn:not(.zone-remove-btn)').style.display = 'none';
+      addZoneRemoveButton(zone, 'bonus');
+      createChargebackInputs();
+      createWeekendBonusInputs();
+      document.getElementById('bonusCalculateSection').classList.remove('hidden');
+    }
+
+    if (saved.srMgrData?.length) {
+      srMgrData = saved.srMgrData;
+      const zone = document.getElementById('srMgrUploadZone');
+      zone.classList.add('loaded');
+      zone.onclick = null;
+      zone.querySelector('h4').textContent = srMgrData.length + ' stores loaded';
+      zone.querySelector('p').textContent = 'Store KPI data ready for calculation';
+      zone.querySelector('.btn:not(.zone-remove-btn)').style.display = 'none';
+      addZoneRemoveButton(zone, 'srmgr');
+      createSrMgrChargebackInputs();
+      buildReqRows();
+      createSrMgrOverrideInputs();
+      document.getElementById('srMgrRequirementsSection').classList.remove('hidden');
+      document.getElementById('srMgrCalculateSection').classList.remove('hidden');
+    }
+
+    applyInputState(saved.inputState, saved.radioGroups);
+
+    // Update req count badges after checkbox values are restored
+    if (saved.srMgrData?.length) {
+      saved.srMgrData.forEach(store => {
+        getStoreAssignments(store.storeName).forEach(({ manager, role }) => {
+          const c = store.storeName.replace(/[^a-zA-Z0-9]/g, '_') + '_' + manager.replace(/[^a-zA-Z0-9]/g, '_');
+          updateReqCount(c, role);
+        });
+      });
+    }
+  } catch(e) { console.error('restoreSession:', e); }
+}
+
+window.addEventListener('beforeunload', saveSession);
+
 // ─── INIT ───────────────────────────────────────────────────────────────
 window.onload = function() {
   // Detect macOS for traffic light spacing
@@ -2386,6 +2490,7 @@ window.onload = function() {
   populateManagerDropdown('newStoreManager');
   renderConfigPage();
   renderReportsPage();
+  restoreSession();
 };
 
 // ─── NAVIGATION ─────────────────────────────────────────────────────────
@@ -2613,6 +2718,7 @@ function parseCommissionData(data) {
   createCommissionChargebackInputs();
   document.getElementById('commissionCalculateSection').classList.remove('hidden');
   showToast(commissionData.length + ' employees loaded');
+  saveSession();
 }
 
 function createCommissionChargebackInputs() {
@@ -2780,6 +2886,7 @@ function parseBonusData(data) {
   createWeekendBonusInputs();
   document.getElementById('bonusCalculateSection').classList.remove('hidden');
   showToast(bonusData.length + ' employees loaded');
+  saveSession();
 }
 
 function createChargebackInputs() {
@@ -3434,6 +3541,7 @@ function clearUploadedFile(type) {
 
   c.sections.forEach(id => { const el = document.getElementById(id); if (el) el.classList.add('hidden'); });
   c.clear();
+  saveSession();
   showToast('File removed', 'info');
 }
 
@@ -3518,6 +3626,7 @@ function parseSrMgrData(data) {
   document.getElementById('srMgrRequirementsSection').classList.remove('hidden');
   document.getElementById('srMgrCalculateSection').classList.remove('hidden');
   showToast(srMgrData.length + ' stores loaded');
+  saveSession();
 }
 
 // ─── REQUIREMENTS INPUT ───────────────────────────────────────────────────
