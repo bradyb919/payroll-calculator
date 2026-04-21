@@ -1013,7 +1013,7 @@ input[type="file"] { display: none; }
 
         <div class="alert alert-blue">
           <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-          <div>Export format matches your payroll system: <strong>Company ID, Worker ID, Pay Component, Amount, Check Seq Number, Check Template</strong>. Only rows with valid Worker IDs are exported.</div>
+          <div>Export format matches your payroll system: <strong>Company ID, Worker ID, Pay Component, Rate, Hours, Amount</strong> (+ tax/net columns). Only rows with valid Worker IDs are exported.</div>
         </div>
 
         <!-- Step 1: Upload -->
@@ -1654,6 +1654,15 @@ input[type="file"] { display: none; }
       </div>
       <div class="cfg-grid">
 
+        <!-- General -->
+        <div class="cfg-card">
+          <div class="cfg-card-title">General</div>
+          <div class="cfg-row">
+            <span class="cfg-label">Company ID</span>
+            <input type="text" class="cfg-input" id="cfg_companyId">
+          </div>
+        </div>
+
         <!-- Commission -->
         <div class="cfg-card">
           <div class="cfg-card-title">Commission</div>
@@ -2137,7 +2146,8 @@ input[type="file"] { display: none; }
 const DEFAULT_CONFIG = {
   // Commission
   commissionRate: 6,
-  commissionPayComp: 'Volume Bonus Amount',
+  companyId: '12122228',
+  commissionPayComp: 'Volume Bonus',
 
   // Monthly Bonus - Profit tiers (threshold in $, rate in %)
   profitT1Threshold: 15000, profitT1Rate: 1,
@@ -2156,9 +2166,9 @@ const DEFAULT_CONFIG = {
   closePenaltyGPThreshold: 26000,
 
   // Monthly Bonus - Pay components
-  profitBonusPayComp: 'Profit Bonus Amount',
-  apBonusPayComp: 'Accessory&VMP Bonus Amount',
-  weekendBonusPayComp: 'Weekend Bonus Amount',
+  profitBonusPayComp: 'Profit Bonus',
+  apBonusPayComp: 'Accessory&VMP Bonus',
+  weekendBonusPayComp: 'Weekend Bonus',
 
   // Sr. Manager - Volume tiers (flat amounts in $, rates in %)
   smVolT1Min: 35000, smVolT1Max: 60000, smVolT1Rate: 1,
@@ -2188,7 +2198,7 @@ const DEFAULT_CONFIG = {
   smReqMult0: 50, smReqMult1: 60, smReqMult2: 80, smReqMult3: 100,
 
   // Sr. Manager - Pay component
-  smBonusPayComp: 'Manager Bonus Amount',
+  smBonusPayComp: 'Manager Bonus',
 
   // Jr. Manager - Volume tiers
   jmVolT1Min: 35000, jmVolT1Max: 60000, jmVolT1Rate: 0.5,
@@ -3060,6 +3070,11 @@ function calculateBonus() {
 }
 
 // ─── EXPORTS ─────────────────────────────────────────────────────────────
+const PAYROLL_HEADER = ['Company ID','Worker ID','Pay Component','Rate','Hours','Amount','FIT Amt','SS Amt','Medicare Amt','State Tax Jurisdiction','SIT Amount','Local Tax Jurisdiction','Local Tax Name','Local Amt','Net Pay','Output Type','Check Number'];
+function payrollRow(wid, payComp, amount) {
+  return [cfg.companyId, wid, payComp, '', '', amount, '', '', '', '', '', '', '', '', '', '', ''];
+}
+
 function exportToExcel(data, filename) {
   const ws = XLSX.utils.aoa_to_sheet(data);
   const wb = XLSX.utils.book_new();
@@ -3068,12 +3083,12 @@ function exportToExcel(data, filename) {
 }
 
 function exportCommissionCSV() {
-  const data = [['Company ID', 'Worker ID', 'Pay Component', 'Amount', 'Check Seq Number', 'Check Template']];
+  const data = [PAYROLL_HEADER];
   commissionData.forEach(emp => {
     const id = employeeIDs[emp.name];
     if (!id) return;
     const adjGP = Math.max(0, emp.grossProfit - getCommissionChargeback(emp.name));
-    data.push(['', id, cfg.commissionPayComp, (adjGP * (cfg.commissionRate / 100)).toFixed(2), '', '']);
+    data.push(payrollRow(id, cfg.commissionPayComp, (adjGP * (cfg.commissionRate / 100)).toFixed(2)));
   });
   exportToExcel(data, 'commission_biweekly_' + today() + '.xlsx');
   showToast('Commission Excel exported');
@@ -3083,7 +3098,7 @@ function exportBonusCSV() {
   const hasComm = commissionData.length > 0;
   const hasBonus = bonusData.length > 0;
   const hasSrMgr = srMgrData.length > 0;
-  const data = [['Company ID', 'Worker ID', 'Pay Component', 'Amount', 'Check Seq Number', 'Check Template']];
+  const data = [PAYROLL_HEADER];
   const allNames = new Set([
     ...(hasComm ? commissionData.map(e => e.name) : []),
     ...(hasBonus ? bonusData.map(e => e.name) : [])
@@ -3096,7 +3111,7 @@ function exportBonusCSV() {
       const ce = commissionData.find(e => e.name === name);
       if (ce && ce.grossProfit > 0) {
         const adjGP = Math.max(0, ce.grossProfit - getCommissionChargeback(name));
-        data.push(['', id, cfg.commissionPayComp, (adjGP * (cfg.commissionRate / 100)).toFixed(2), '', '']);
+        data.push(payrollRow(id, cfg.commissionPayComp, (adjGP * (cfg.commissionRate / 100)).toFixed(2)));
       }
     }
     if (hasBonus) {
@@ -3110,10 +3125,10 @@ function exportBonusCSV() {
         let { pb } = calcProfitBonus(adjGP);
         let { ab } = calcAPBonus(adjAP);
         if (be.closeRate < cfg.closePenaltyCloseThreshold && be.grossProfit < cfg.closePenaltyGPThreshold) { pb *= (1 - cfg.closePenaltyRate / 100); ab *= (1 - cfg.closePenaltyRate / 100); }
-        if (pb > 0) data.push(['', id, cfg.profitBonusPayComp, pb.toFixed(2), '', '']);
-        if (ab > 0) data.push(['', id, cfg.apBonusPayComp, ab.toFixed(2), '', '']);
+        if (pb > 0) data.push(payrollRow(id, cfg.profitBonusPayComp, pb.toFixed(2)));
+        if (ab > 0) data.push(payrollRow(id, cfg.apBonusPayComp, ab.toFixed(2)));
         const wb2 = getWeekendBonus(name);
-        if (wb2 > 0) data.push(['', id, cfg.weekendBonusPayComp, wb2.toFixed(2), '', '']);
+        if (wb2 > 0) data.push(payrollRow(id, cfg.weekendBonusPayComp, wb2.toFixed(2)));
       }
     }
   });
@@ -3121,18 +3136,19 @@ function exportBonusCSV() {
   // Append Manager bonus rows
   if (hasSrMgr) {
     srMgrData.forEach(store => {
-      const manager = getMappingManager(store.storeName);
-      const role    = getMappingRole(store.storeName);
-      if (!manager) return;
-      const wid = employeeIDs[manager];
-      if (!wid) return;
-      const c = store.storeName.replace(/[^a-zA-Z0-9]/g, '_');
-      const { volumeBonus, closeRateBonus, kpiBonus, detGPPS, detClose } = calcStoreBonus(getStoreWithOverrides(store), role);
-      const hasDetractor = detGPPS || detClose;
-      const multiplier = getReqMultiplier(getReqMet(c, role), role);
-      const rawBonus = volumeBonus + closeRateBonus + kpiBonus;
-      const finalBonus = hasDetractor ? 0 : rawBonus * multiplier;
-      if (finalBonus > 0) data.push(['', wid, cfg.smBonusPayComp, finalBonus.toFixed(2), '', '']);
+      const storeKey = store.storeName.replace(/[^a-zA-Z0-9]/g, '_');
+      const s        = getStoreWithOverrides(store);
+      getStoreAssignments(store.storeName).forEach(({ manager, role }) => {
+        const wid = employeeIDs[manager];
+        if (!wid) return;
+        const c = storeKey + '_' + manager.replace(/[^a-zA-Z0-9]/g, '_');
+        const { volumeBonus, closeRateBonus, kpiBonus, detGPPS, detClose } = calcStoreBonus(s, role);
+        const hasDetractor = detGPPS || detClose;
+        const multiplier = getReqMultiplier(getReqMet(c, role), role);
+        const rawBonus = volumeBonus + closeRateBonus + kpiBonus;
+        const finalBonus = hasDetractor ? 0 : rawBonus * multiplier;
+        if (finalBonus > 0) data.push(payrollRow(wid, cfg.smBonusPayComp, finalBonus.toFixed(2)));
+      });
     });
   }
 
@@ -3175,18 +3191,18 @@ function exportBonusExcel() {
 }
 
 function copyCommissionData() {
-  let text = 'Company ID\tWorker ID\tPay Component\tAmount\tCheck Seq Number\tCheck Template\n';
+  let text = PAYROLL_HEADER.join('\t') + '\n';
   commissionData.forEach(emp => {
     const id = employeeIDs[emp.name];
     if (!id) return;
     const adjGP = Math.max(0, emp.grossProfit - getCommissionChargeback(emp.name));
-    text += `\t${id}\t${cfg.commissionPayComp}\t${(adjGP * (cfg.commissionRate / 100)).toFixed(2)}\t\t\n`;
+    text += payrollRow(id, cfg.commissionPayComp, (adjGP * (cfg.commissionRate / 100)).toFixed(2)).join('\t') + '\n';
   });
   copyToClipboard(text);
 }
 
 function copyBonusData() {
-  let text = 'Company ID\tWorker ID\tPay Component\tAmount\tCheck Seq Number\tCheck Template\n';
+  let text = PAYROLL_HEADER.join('\t') + '\n';
   bonusData.forEach(emp => {
     const id = employeeIDs[emp.name];
     if (!id) return;
@@ -3198,10 +3214,10 @@ function copyBonusData() {
     let { pb } = calcProfitBonus(adjGP);
     let { ab } = calcAPBonus(adjAP);
     if (emp.closeRate < cfg.closePenaltyCloseThreshold && emp.grossProfit < cfg.closePenaltyGPThreshold) { pb *= (1 - cfg.closePenaltyRate / 100); ab *= (1 - cfg.closePenaltyRate / 100); }
-    if (pb > 0) text += `\t${id}\t${cfg.profitBonusPayComp}\t${pb.toFixed(2)}\t\t\n`;
-    if (ab > 0) text += `\t${id}\t${cfg.apBonusPayComp}\t${ab.toFixed(2)}\t\t\n`;
+    if (pb > 0) text += payrollRow(id, cfg.profitBonusPayComp, pb.toFixed(2)).join('\t') + '\n';
+    if (ab > 0) text += payrollRow(id, cfg.apBonusPayComp, ab.toFixed(2)).join('\t') + '\n';
     const wk = getWeekendBonus(emp.name);
-    if (wk > 0) text += `\t${id}\t${cfg.weekendBonusPayComp}\t${wk.toFixed(2)}\t\t\n`;
+    if (wk > 0) text += payrollRow(id, cfg.weekendBonusPayComp, wk.toFixed(2)).join('\t') + '\n';
   });
   copyToClipboard(text);
 }
@@ -3779,7 +3795,7 @@ function calculateSrManagerBonus() {
 
 // ─── EXPORTS ──────────────────────────────────────────────────────────────
 function exportSrMgrBonus() {
-  const data = [['Company ID','Worker ID','Pay Component','Amount','Check Seq Number','Check Template']];
+  const data = [PAYROLL_HEADER];
   srMgrData.forEach(store => {
     const storeKey = store.storeName.replace(/[^a-zA-Z0-9]/g, '_');
     const s        = getStoreWithOverrides(store);
@@ -3792,7 +3808,7 @@ function exportSrMgrBonus() {
       const multiplier = getReqMultiplier(getReqMet(c, role), role);
       const rawBonus = volumeBonus + closeRateBonus + kpiBonus;
       const finalBonus = hasDetractor ? 0 : rawBonus * multiplier;
-      if (finalBonus > 0) data.push(['', wid, cfg.smBonusPayComp, finalBonus.toFixed(2), '', '']);
+      if (finalBonus > 0) data.push(payrollRow(wid, cfg.smBonusPayComp, finalBonus.toFixed(2)));
     });
   });
   exportToExcel(data, 'manager_bonus_payroll_' + today() + '.xlsx');
