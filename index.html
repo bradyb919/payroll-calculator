@@ -2367,7 +2367,8 @@ let commissionData = [];
 let bonusData = [];
 
 // ─── SESSION PERSISTENCE ────────────────────────────────────────────────
-const SESSION_KEY = 'payrollSession_v2';
+const SESSION_KEY = 'payrollSession_v3';
+let _saveTimer = null;
 
 function saveSession() {
   try {
@@ -2390,6 +2391,12 @@ function saveSession() {
   } catch(e) { console.error('saveSession:', e); }
 }
 
+// Save within 400ms of any input change — handles app force-close reliably
+function scheduleSave() {
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(saveSession, 400);
+}
+
 function applyInputState(inputState, radioGroups) {
   if (inputState) {
     Object.entries(inputState).forEach(([id, value]) => {
@@ -2400,8 +2407,9 @@ function applyInputState(inputState, radioGroups) {
   }
   if (radioGroups) {
     Object.entries(radioGroups).forEach(([name, value]) => {
-      const el = document.querySelector(`input[type="radio"][name="${name}"][value="${CSS.escape(value)}"]`);
-      if (el) el.checked = true;
+      document.querySelectorAll(`input[type="radio"][name="${name}"]`).forEach(el => {
+        if (el.value === value) el.checked = true;
+      });
     });
   }
 }
@@ -2468,7 +2476,10 @@ function restoreSession() {
   } catch(e) { console.error('restoreSession:', e); }
 }
 
-window.addEventListener('beforeunload', saveSession);
+// Save on any input change so close/shutdown never loses data
+document.addEventListener('change', scheduleSave);
+document.addEventListener('input', scheduleSave);
+window.addEventListener('beforeunload', saveSession); // final flush on clean close
 
 // ─── INIT ───────────────────────────────────────────────────────────────
 window.onload = function() {
