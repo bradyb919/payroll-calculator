@@ -1372,7 +1372,7 @@ input[type="file"] { display: none; }
             <strong>Sr. Manager:</strong> Vol (1–2%/$3k/$5k) + Close $500 + KPI up to $3k · Requirements: 3/3=100%, 2/3=80%, 1/3=60%, 0/3=50% &nbsp;|&nbsp;
             <strong>Jr. Manager:</strong> Vol (0.5–1%/$1.5k) + Close $250 + KPI up to $1.5k · Requirements: 2/2=100%, 1/2=80%, 0/2=60% &nbsp;|&nbsp;
             <strong>MIT:</strong> Vol (0.1–0.2%/$400/$1k) + Close $100 + KPI up to $400 · Requirements: 168 Rebiz hrs &nbsp;|&nbsp;
-            <strong>Detractors (Sr/Jr):</strong> GPPS &lt;$31 or Close Rate &lt;20% = bonus forfeited.
+            <strong>Detractors (Sr/Jr):</strong> Setup GPPS &lt;$31 or Close Rate &lt;20% = bonus forfeited.
           </div>
         </div>
 
@@ -1445,7 +1445,7 @@ input[type="file"] { display: none; }
           <div class="card-body">
             <div class="alert alert-amber" style="margin-bottom:16px;">
               <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-              <div>Expected columns: <strong>A: Store Name, B: GP, C: Box Conv %, D: SMT GA, E: VZ Protection %, F: AGPPS, G: GPPS / Ready Go Per Smart</strong> (G is optional — used for detractor check). The "Total" row is automatically skipped.</div>
+              <div>Expected columns: <strong>A: Store Name, B: GP, C: Box Conv %, D: SMT GA, E: VZ Protection %, F: AGPPS, G: Setup GPPS</strong> (G is optional — used for detractor check). The "Total" row is automatically skipped.</div>
             </div>
             <div class="upload-zone" id="srMgrUploadZone" onclick="document.getElementById('srMgrFile').click()">
               <div class="upload-zone-icon">
@@ -1516,7 +1516,7 @@ input[type="file"] { display: none; }
               <div>VZ Protection % Override</div>
               <div>SMT GA Override</div>
               <div>AGPPS Override</div>
-              <div>GPPS Override</div>
+              <div>Setup GPPS Override</div>
             </div>
             <div id="srMgrOverrideContainer"></div>
           </div>
@@ -1867,7 +1867,7 @@ input[type="file"] { display: none; }
         <div class="cfg-card">
           <div class="cfg-card-title">Sr. Manager — Detractors &amp; Requirements</div>
           <div class="cfg-row">
-            <span class="cfg-label">GPPS / Ready Go Per Smart Detractor Below ($)</span>
+            <span class="cfg-label">Setup GPPS Detractor Below ($)</span>
             <input type="number" class="cfg-input" id="cfg_smDetGppsThreshold" step="1" min="0">
           </div>
           <div class="cfg-row">
@@ -1966,7 +1966,7 @@ input[type="file"] { display: none; }
             <input type="number" class="cfg-input" id="cfg_jmKpi2LowBonus" step="50" min="0">
           </div>
           <div class="cfg-row">
-            <span class="cfg-label">GPPS Detractor Below ($)</span>
+            <span class="cfg-label">Setup GPPS Detractor Below ($)</span>
             <input type="number" class="cfg-input" id="cfg_jmDetGppsThreshold" step="1" min="0">
           </div>
           <div class="cfg-row">
@@ -2683,7 +2683,7 @@ function detectColumns(headerRow) {
     if (cols.vzProtection === undefined && (h.includes('vz prot') || (h.includes('vz') && h.includes('prot')) || h === 'vz protection %')) cols.vzProtection = i;
     if (cols.vzEngage === undefined && (h.includes('vz engage') || h.includes('engage') || h === 'vz engage %')) cols.vzEngage = i;
     if (cols.agpps === undefined && (h === 'agpps' || h.includes('agpps') || h === 'avg gpps' || (h.includes('gp') && h.includes('per smart') && !h.includes('ready')))) cols.agpps = i;
-    if (cols.gpps === undefined && (h === 'gpps' || h.includes('ready go per smart') || h.includes('gpps/') || (h.includes('ready') && h.includes('smart')))) cols.gpps = i;
+    if (cols.gpps === undefined && (h === 'gpps' || h === 'setup gpps' || h.includes('setup gpps') || h.includes('ready go per smart') || h.includes('gpps/') || (h.includes('ready') && h.includes('smart')))) cols.gpps = i;
   });
   return cols;
 }
@@ -3801,7 +3801,7 @@ function calcSrManagerBonusCalc(store) {
   if      (kpisHit === 3) { kpiBonus = gp >= cfg.smKpiHighGPThreshold ? cfg.smKpi3HighBonus : cfg.smKpi3LowBonus; kpiLabel = 'All 3 KPIs'; }
   else if (kpisHit === 2) { kpiBonus = gp >= cfg.smKpiHighGPThreshold ? cfg.smKpi2HighBonus : cfg.smKpi2LowBonus; kpiLabel = '2 of 3 KPIs'; }
 
-  // Detractors — GPPS uses column G (Ready Go Per Smart); falls back to AGPPS if column G absent
+  // Detractors — Setup GPPS column; falls back to AGPPS if column absent
   const gppsVal = store.gpps !== null ? store.gpps : store.agpps;
   const detGPPS = gppsVal < cfg.smDetGppsThreshold;
   const detClose = store.closeRate < cfg.smDetCloseThreshold;
@@ -3846,7 +3846,7 @@ function calculateSrManagerBonus() {
       grandTotal += finalBonus;
 
       const detParts = [];
-      if (detGPPS) detParts.push('<span class="badge badge-red">GPPS <$' + cfg.smDetGppsThreshold + '</span>');
+      if (detGPPS) detParts.push('<span class="badge badge-red">Setup GPPS <$' + cfg.smDetGppsThreshold + '</span>');
       if (detClose) detParts.push('<span class="badge badge-red">Close Rate <20%</span>');
 
       const kpiLines = [
@@ -4299,7 +4299,7 @@ function renderReportDetail(report) {
             ${s.rows.map(r => {
               const role = r.role || 'sr_manager';
               const totalReqs = role === 'sr_manager' ? 3 : role === 'jr_manager' ? 2 : 1;
-              const det = [r.detGPPS ? 'GPPS' : '', r.detClose ? 'Close Rate' : ''].filter(Boolean);
+              const det = [r.detGPPS ? 'Setup GPPS' : '', r.detClose ? 'Close Rate' : ''].filter(Boolean);
               const kpiLines = [
                 `<span style="color:${r.kpi1?'var(--green)':'var(--red)'};font-size:10px;">${r.kpi1?'✓':'✗'} VZ ${r.vzProtection.toFixed(1)}%</span>`,
                 `<span style="color:${r.kpi2?'var(--green)':'var(--red)'};font-size:10px;">${r.kpi2?'✓':'✗'} AGPPS $${r.agpps.toFixed(0)}</span>`,
@@ -4335,7 +4335,7 @@ function renderReportDetail(report) {
 
 function exportSrMgrDetailed() {
   const wb = XLSX.utils.book_new();
-  const detail = [['Store','Manager','Role','Worker ID','Store GP','Chargeback','Adj GP','Close Rate %','VZ Protection %','SMT GA','AGPPS','GPPS / Ready Go Per Smart',
+  const detail = [['Store','Manager','Role','Worker ID','Store GP','Chargeback','Adj GP','Close Rate %','VZ Protection %','SMT GA','AGPPS','Setup GPPS',
     'Volume Bonus','Close Rate Bonus','KPI Bonus','Detractors','Req Met','Multiplier %','Raw Bonus','Final Bonus']];
   srMgrData.forEach(store => {
     const storeKey   = store.storeName.replace(/[^a-zA-Z0-9]/g, '_');
@@ -4350,7 +4350,7 @@ function exportSrMgrDetailed() {
       const multiplier = getReqMultiplier(reqMet, role);
       const rawBonus = volumeBonus + closeRateBonus + kpiBonus;
       const finalBonus = hasDetractor ? 0 : rawBonus * multiplier;
-      const detText = [detGPPS?'GPPS<$'+cfg.smDetGppsThreshold:'', detClose?'Close Rate<'+cfg.smDetCloseThreshold+'%':''].filter(Boolean).join(', ') || 'None';
+      const detText = [detGPPS?'Setup GPPS<$'+cfg.smDetGppsThreshold:'', detClose?'Close Rate<'+cfg.smDetCloseThreshold+'%':''].filter(Boolean).join(', ') || 'None';
       detail.push([store.storeName, manager, roleLabel(role), wid, store.gp, chargeback, s.gp, store.closeRate, s.vzProtection, s.smtGA, s.agpps, store.gpps !== null ? store.gpps : '',
         volumeBonus, closeRateBonus, kpiBonus, detText, reqMet, (multiplier*100).toFixed(0)+'%', rawBonus, finalBonus]);
     });
