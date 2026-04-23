@@ -2655,7 +2655,7 @@ function handleImportFile(event) {
 function detectColumns(headerRow) {
   const cols = {};
   (headerRow || []).forEach((cell, i) => {
-    const h = String(cell || '').trim().toLowerCase();
+    const h = String(cell || '').trim().toLowerCase().replace(/\s+/g, ' ');
     if (!h) return;
     // Name / Employee
     if (cols.name === undefined &&
@@ -3845,9 +3845,12 @@ function calculateSrManagerBonus() {
       const finalBonus = hasDetractor ? 0 : rawBonus * multiplier;
       grandTotal += finalBonus;
 
+      const gppsDisplay = s.gpps !== null ? s.gpps : s.agpps;
+      const gppsIsActual = s.gpps !== null;
       const detParts = [];
       if (detGPPS) detParts.push('<span class="badge badge-red">Setup GPPS <$' + cfg.smDetGppsThreshold + '</span>');
       if (detClose) detParts.push('<span class="badge badge-red">Close Rate <20%</span>');
+      const gppsLine = `<span style="font-size:11px;">Setup GPPS: <strong style="color:${detGPPS?'var(--red)':'var(--green)'}">$${gppsDisplay.toFixed(2)}</strong>${!gppsIsActual?' <em style="font-size:10px;color:var(--amber)">(agpps fallback)</em>':''}</span>`;
 
       const kpiLines = [
         `<span class="${kpi1?'kpi-hit':'kpi-miss'}">${kpi1?'✓':'✗'} VZ Prot ${s.vzProtection.toFixed(1)}%</span>`,
@@ -3872,7 +3875,7 @@ function calculateSrManagerBonus() {
         <td>${closeRateBonus > 0 ? '<span class="badge badge-green">$' + closeRateBonus.toFixed(0) + '</span>' : '<span class="text-muted">—</span>'}</td>
         <td>$${kpiBonus.toFixed(2)}<br><span class="text-xs text-muted">${kpiLabel}</span></td>
         <td class="kpi-cell">${kpiLines}</td>
-        <td>${detParts.length ? detParts.join('<br>') : '<span class="badge badge-green">None</span>'}</td>
+        <td>${gppsLine}${detParts.length ? '<br>' + detParts.join('<br>') : ''}</td>
         <td><span class="badge ${reqBadgeClass}">${reqMet}/${totalReqs} → ${multPct}%</span></td>
         <td><strong style="color:${finalBonus>0?'var(--green)':'var(--text-muted)'}">$${finalBonus.toFixed(2)}</strong>${hasDetractor ? '<br><span class="text-xs text-red">Forfeited</span>' : ''}</td>
       </tr>`;
